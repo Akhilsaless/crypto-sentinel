@@ -1,61 +1,46 @@
-# Crypto Sentinel — Integration & Release Gate
+# Crypto Sentinel — Verified engineering handoff
+Updated: 2026-11-03
 
-Current repository: imported Lovable Phase 1 React UI plus a **separate**, paper-only FastAPI development backend under `paper_backend/`.
+## Goal
+Consolidate five trading prototype concepts into Crypto Sentinel, without further Lovable AI credits. Provide safely bounded paper trading and research, with no real-money execution.
 
-**Not production ready.** The frontend still displays synthetic portfolio/signal data. It does not yet authenticate to the Python backend. Do not deploy it as a real trading product or advertise paper executions as connected until integrated and tested.
+## Verified result
+- Lovable Crypto Sentinel Phase 1 React source imported to `main`. Original Lovable project unchanged and unpublished.
+- The four concept-source Lovable projects were not modified.
+- React app includes Signals, Alerts, Journal, Chart Review, Learning, mobile navigation, existing sample trading pages, plus `/paper-lab`.
+- Python FastAPI backend at `paper_backend/` includes Argon2 password hashing, hashed bearer sessions, virtual ledgers, paper order idempotency, account isolation, risk tightening, daily realized-loss cap, read-only price provider, paper kill switch, audit records and an educational SMA backtest.
+- `/paper-lab` uses relative `/paper-api` requests to the local backend. Development Vite proxy targets `http://127.0.0.1:8000`. No browser-persisted bearer token.
+- GitHub Actions validation: frontend test + lint + build, backend test. See Actions for latest results.
+- No live order endpoint; no exchange credentials or trading integrations. No additional Lovable credits used.
 
-## Run locally
-Frontend: `npm ci && npm test && npm run dev`.
-
-Backend: `python -m venv .venv`, activate it, `pip install -r paper_backend/requirements.txt`, then from `paper_backend`: `uvicorn sentinel.main:app --reload`.
-
-Backend test: from `paper_backend`: `pytest -q`.
-
-## Safety boundaries
-- Never place exchange API keys or secrets in Vite frontend variables, source code, or this repository.
-- There are no routes to execute live orders; market adapter is read-only.
-- The kill switch blocks new paper orders but does not liquidate positions.
-- A development market adapter is not a guarantee of broker fill prices; fees and slippage must be modeled before realistic paper simulations.
-- The development auth and SQLite setup require rate limiting, CSRF/CORS/session threat model, credential recovery, deployment secrets, monitoring, and adversarial tests before public exposure.
-- Local alerts do not run in the background; sample signal scores are not financial recommendations.
-- GitHub repo was found PUBLIC at import time. Do not add personal information or trading credentials.
-
-## Work remaining to close phases 2–4
-1. Independently run CI and fix any test/build failures.
-2. Implement versioned `/api` client in React and an auth/session flow; keep sample-vs-paper contexts separate.
-3. Add backed paper-account view and explicit order confirmation; prove no live trading path exists.
-4. Validate quote freshness, source reliability, fees/slippage, delayed-data UI and outage failure modes.
-5. Security review and public deployment review (hosting, backups, abuse controls, audit integrity, rollback).
-6. Complete mobile/desktop accessibility and end-to-end smoke tests.
-
-## November 3, 2026 — current implementation checkpoint
-
-- Phase 1: Imported React research UI and its sample-only screens are preserved. No Lovable credits used and source Lovable projects were not edited.
-- Phase 2: Separate FastAPI paper engine with login, user isolation, virtual portfolio/orders, backtesting, read-only quote lookup, idempotent order IDs, risk caps, emergency stop and server-side stale-quote rejection is present. Development-only, not public-user hardened.
-- Phase 3: The existing React `/paper-lab` screen uses a local Vite same-origin `/paper-api` proxy; its session token is held in memory, not persisted. Frontend order submission now requires a fresh non-sample quote, order confirmation, and an enabled paper account. Sample dashboard remains separate. Added `paperApi.test.ts` coverage for auth header and proxy failure responses.
-- Phase 4: CI workflow includes Python and frontend validation (plus lint). Live deployment, multi-device end-to-end testing, fee/slippage modeling for paper execution, quote-source reliability monitoring, application abuse protection, credential recovery, audit integrity and independent security review are **not verified/unfinished**. Release is blocked.
-
-### Local acceptance commands
-
-```sh
-python -m pip install -r paper_backend/requirements.txt
-(cd paper_backend && python -m pytest -q)
-npm install --no-audit --no-fund
-npm test -- --run
-npm run lint
-npm run build
-# shell A: (cd paper_backend && uvicorn sentinel.main:app --host 127.0.0.1 --port 8000)
-# shell B: npm run dev
-# Open http://localhost:8080/paper-lab ; use demo credentials only
+## Run both locally
+Terminal 1:
 ```
+cd paper_backend
+python -m venv .venv
+# activate .venv
+pip install -r requirements.txt
+uvicorn sentinel.main:app --host 127.0.0.1 --port 8000
+```
+Terminal 2, repository root:
+```
+npm install --no-audit --no-fund
+npm run dev
+```
+Open `http://localhost:8080/paper-lab`. Real market-price requests use public CoinGecko and require a working network connection; if unavailable, orders must fail closed. Tests inject fake data only into an explicitly test-named database. Do not make the backend publicly reachable.
 
-### Safety smoke checks before any public deployment
+## Four phase acceptance
+1. **UI consolidation:** source merged into GitHub. Automated tests and build pass; full real-browser and accessibility review outstanding.
+2. **Backend/integration:** local paper API and browser route exist. No verified deployed API, HTTPS, full operational security, or real-provider end-to-end test.
+3. **Paper trading/backtest:** server-side virtual orders, limits and historical strategy test implemented. Needs fees/slippage in interactive paper fills, market-data reliability testing, and more realistic simulation.
+4. **Production validation:** CI checks are functioning, but this is **NOT production-ready**. Threat modeling, rate limiting, operational monitoring, backup/restore, independent security review, end-to-end browser tests, network/provider tests, robust multi-user infrastructure, and relevant compliance review remain.
 
-1. Backend offline: paper account login/order submission must fail closed; never show a synthetic order as confirmed.
-2. Sample or expired quote: UI rejects submission; backend independently rejects samples (except .test.sqlite3 fixtures) and quotes older than 120 seconds.
-3. Paper account A cannot read user B orders or positions; missing/expired bearer token returns 401.
-4. Confirmed paper order affects virtual funds only; no endpoint or adapter can place a live exchange order.
-5. Active kill switch rejects new paper orders; it does NOT close virtual holdings. No automatic reset.
-6. Credentials and tokens never enter logs, query strings, Vite variables, screenshots or repository commits.
+## Important constraints
+- GitHub repository was detected as **PUBLIC**. Do not commit credentials, wallets, exchange keys, sensitive personal data, or database files. Set repository to private through GitHub settings if desired.
+- The imported `package-lock.json` is out of sync with `package.json`. CI presently runs `npm install` rather than `npm ci`; regenerate and commit a consistent lockfile before a reproducible production pipeline.
+- The UI's legacy Dashboard and Exchanges pages still use sample data. Only `/paper-lab` can connect to the paper-only development API.
+- Server kill switch blocks new virtual orders but does **not** liquidate existing virtual positions. No self-service reset.
+- Never present simulation scores or profits as real trading performance.
 
-**Release decision: BLOCKED pending passing CI, independent browser tests and security/operational controls.** This file records implementation, not an assertion that all four phases are production complete.
+## Current decision
+Continue via GitHub at zero Lovable AI credits; do not deploy publicly or enable real-money trading. Next required milestone is a secure, independently tested staging deployment and complete provider/browser/operational QA.
