@@ -47,8 +47,8 @@ def test_kraken_ohlc_excludes_unfinished_final_bar():
     for i in range(90):
         ts=int(NOW-(90-i)*STEP)
         p=100+i*0.2
-        rows.append([ts,str(p),"0",str(p+0.6),str(p-0.6),str(p),"0","1"])
-    rows.append([int(NOW), "100", "0", "999999", "1", "999999", "0", "1"])
+        rows.append([ts,str(p),str(p+0.6),str(p-0.6),str(p),"0","1","1"])
+    rows.append([int(NOW), "100", "999999", "1", "999999", "0", "1", "1"])
     def handler(request):
         assert request.url.params["pair"]=="XBTUSD"
         return httpx.Response(200,json={"error":[],"result":{"XXBTZUSD":rows,"last":NOW}})
