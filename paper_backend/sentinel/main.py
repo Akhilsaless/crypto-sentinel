@@ -21,6 +21,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from sentinel.backtest import BacktestRequest, run_backtest
 from sentinel.scanner import kraken_candles, analyze, MarketDataError
+from sentinel.evaluation import evaluate
 
 COINS = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}
 UNIT = 1_000_000
@@ -213,6 +214,17 @@ def build_app(db_path=None,quote_provider=None):
         try:
             bars=kraken_candles(symbol,frame)
             return analyze(symbol,frame,bars)
+        except MarketDataError as e:
+            raise HTTPException(503,str(e)) from e
+
+    @app.get("/research/evaluate/{symbol}/{frame}")
+    def evaluate_historical(symbol:str,frame:str,fee_bps:int=15,slippage_bps:int=15,user=Depends(auth)):
+        symbol=symbol.upper()
+        if symbol not in COINS or frame not in ("intraday","swing"):
+            raise HTTPException(422,"Unsupported symbol or timeframe")
+        try:
+            candles=kraken_candles(symbol,frame)
+            return {"symbol":symbol,"timeframe":frame,**evaluate(candles,frame,fee_bps,slippage_bps)}
         except MarketDataError as e:
             raise HTTPException(503,str(e)) from e
 
