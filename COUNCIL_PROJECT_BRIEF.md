@@ -11,8 +11,9 @@ Updated 2026-11-03 (UTC). This is a checkpoint, NOT a finished trading system.
 ## Verified implementation
 1. Phase A — read-only market intelligence (new): `sentinel/scanner.py` uses Kraken public OHLC for BTC/ETH/SOL; requests completed 1h and 4h bars, rejects gaps/stale/nonfinite values; computes EMA9/21, RSI14, ATR14 and 20-bar breakout.
 2. Phase B — explainable research signals (new): `analyze()` returns `entry_watch`, `exit_watch`, or `no_trade`, with indicator reasons and hypothetical ATR stop/target. This is an **unvalidated example strategy**, not a trade recommendation. Authenticated `GET /research/scan/{symbol}/{frame}`; React `/market-scanner`.
+   Additional evaluation: `sentinel/evaluation.py` executes scanner rules on a chronological 30% holdout using only closed prior candles, next-bar opens, fee/slippage assumptions, stop-first behavior, max 20% notional and 1% planned stop risk. `/research/evaluate/{symbol}/{frame}` and the market scanner UI expose results. This is an unvalidated model, **not evidence of profitability**.
 3. Phase C — automation foundation (new): `python -m sentinel.scanner_job` processes six combinations, records dedup state on *confirmed successful alert delivery*, supports optional Telegram environment secrets, and fails closed for provider outage. **No 24/7 worker or recurring schedule is enabled**; no Telegram credentials configured.
-4. Phase D — offline regression tests (new): `tests/test_scanner.py` and `tests/test_scanner_job.py` cover feed validity, trend direction, outage, and dedup behaviour. Existing API/frontend CI preserved. **New tests/builds have not been independently verified passing in this session**.
+4. Phase D — offline regression tests (new): `tests/test_scanner.py` and `tests/test_scanner_job.py` and `tests/test_evaluation.py` cover feed validity, trend direction, outage, dedup, fee sensitivity and chronological holdout behavior. Existing API/frontend CI preserved. **New tests/builds have not been independently verified passing in this session**.
 5. Existing: React dashboard and Paper Lab, authenticated FastAPI simulated account ledger, paper orders, historical SMA backtest, paper-only kill switch. No live exchange adapter or live-order endpoint.
 
 ## Run the research scanner locally
@@ -44,3 +45,9 @@ Optional `SENTINEL_TELEGRAM_BOT_TOKEN` and `SENTINEL_TELEGRAM_CHAT_ID` env value
 
 ## Next action
 Run CI/test suite and inspect actual failure logs; fix any failures; validate live provider responses; deploy a protected staging research scanner; then test alerts and run prolonged forward paper monitoring. Do not claim four phases are complete until each measurable release gate is satisfied.
+
+## CI findings during the current session
+- GitHub Actions run 41591484574: backend green; frontend red (mobile navigation test broken by new sidebar item).
+- GitHub Actions run 41591733138: backend green; frontend had one outdated expected route count. Both navigation defects were corrected.
+- GitHub Actions run 41591868738: frontend green; backend failed one malformed synthetic Kraken OHLC fixture. Fixture was corrected at commit 7ad6849.
+- Latest additions to the evaluation engine and tests require fresh independent CI verification. **Do not infer green status from the absence of a failure email.**
