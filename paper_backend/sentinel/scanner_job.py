@@ -54,9 +54,15 @@ def telegram_notify(record):
     message=(f"Crypto Sentinel RESEARCH ONLY: {record['symbol']} {record['timeframe']} "
              f"{record['signal']} at indicative ${record['price_usd']} USD. "
              f"Candle {record['as_of_candle']}. NOT a trade recommendation.")
-    response=httpx.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                        json={"chat_id":chat,"text":message},timeout=10)
-    response.raise_for_status()
+    try:
+        response=httpx.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                            json={"chat_id":chat,"text":message},timeout=10)
+        response.raise_for_status()
+        if response.json().get("ok") is not True:
+            raise ValueError("Provider declined delivery")
+    except (httpx.HTTPError, ValueError) as exc:
+        # Suppress sensitive bot URL/token from provider exceptions and logs.
+        raise RuntimeError("Telegram delivery failed") from None
     return True
 
 def main():
