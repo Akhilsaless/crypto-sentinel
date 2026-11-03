@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from sentinel.backtest import BacktestRequest, run_backtest
 from sentinel.scanner import kraken_candles, analyze, MarketDataError
 from sentinel.evaluation import evaluate
+from sentinel.exchange_public import exchange_candles
 
 COINS = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}
 UNIT = 1_000_000
@@ -225,6 +226,33 @@ def build_app(db_path=None,quote_provider=None):
         try:
             candles=kraken_candles(symbol,frame)
             return {"symbol":symbol,"timeframe":frame,**evaluate(candles,frame,fee_bps,slippage_bps)}
+        except MarketDataError as e:
+            raise HTTPException(503,str(e)) from e
+
+    @app.get("/research/exchanges/{exchange}/scan/{symbol}/{frame}")
+    def exchange_scan(exchange:str,symbol:str,frame:str,user=Depends(auth)):
+        """Read-only, authenticated exchange spot research. No order capability."""
+        symbol=symbol.upper()
+        if exchange not in ("binance","coindcx") or symbol not in COINS or frame not in ("intraday","swing"):
+            raise HTTPException(422,"Unsupported exchange, asset or timeframe")
+        try:
+            bars=exchange_candles(exchange,symbol,frame)
+            result=analyze(symbol,frame,bars)
+            return {**result,"exchange":exchange,"quote_currency":"USDT",
+                    "warning":"Experimental research using USDT quote, not guaranteed USD. No exchange order or balance access."}
+        except MarketDataError as e:
+            raise HTTPException(503,str(e)) from e
+
+    @app.get("/research/exchanges/{exchange}/evaluate/{symbol}/{frame}")
+    def exchange_evaluate(exchange:str,symbol:str,frame:str,
+                          fee_bps:int=15,slippage_bps:int=15,user=Depends(auth)):
+        symbol=symbol.upper()
+        if exchange not in ("binance","coindcx") or symbol not in COINS or frame not in ("intraday","swing"):
+            raise HTTPException(422,"Unsupported exchange, asset or timeframe")
+        try:
+            bars=exchange_candles(exchange,symbol,frame)
+            return {"exchange":exchange,"symbol":symbol,"timeframe":frame,"quote_currency":"USDT",
+                    **evaluate(bars,frame,fee_bps,slippage_bps)}
         except MarketDataError as e:
             raise HTTPException(503,str(e)) from e
 
