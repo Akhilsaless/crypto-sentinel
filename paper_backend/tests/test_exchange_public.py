@@ -102,3 +102,18 @@ def test_exchange_scanner_requires_authentication_and_remains_read_only(tmp_path
         assert got.json()["mode"]=="read_only_research"
         assert client.post("/live/orders",headers=token).status_code==404
         assert client.get("/research/exchanges/unknown/scan/BTC/intraday",headers=token).status_code==422
+
+
+def test_binance_does_not_silently_skip_bad_rows_or_gaps():
+    data=binance_payload()
+    data[12]=["bad-row"]
+    with httpx.Client(transport=httpx.MockTransport(
+            lambda req:httpx.Response(200,json=data))) as client:
+        with pytest.raises(MarketDataError):
+            exchange_candles("binance","BTC","intraday",client,now=NOW)
+    gap=binance_payload()
+    del gap[24]
+    with httpx.Client(transport=httpx.MockTransport(
+            lambda req:httpx.Response(200,json=gap))) as client:
+        with pytest.raises(MarketDataError,match="Missing"):
+            exchange_candles("binance","BTC","intraday",client,now=NOW)
