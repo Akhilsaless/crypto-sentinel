@@ -25,6 +25,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - run: npm ci
+      # Lovable's exported npm lockfile is currently out of sync; use npm install until reconciled.
+      - run: npm install --no-audit --no-fund
       - run: npm test -- --run
       - run: npm run build
