@@ -1,5 +1,10 @@
 name: CoinDCX Binance Read-Only Market Check
 on:
+  push:
+    paths:
+      - "paper_backend/sentinel/exchange_public.py"
+      - "paper_backend/sentinel/exchange_worker.py"
+      - ".github/workflows/read-only-exchange-scan.yml"
   workflow_dispatch:
   schedule:
     # Best-effort hourly cloud scan, not a continuously running 24/7 service.
