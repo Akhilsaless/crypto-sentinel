@@ -6,4 +6,4 @@ export const navigationGroups = [
   { title: "Trading Controls", items: [{ title: "Strategy & Risk", url: "/strategy", icon: Cog }, { title: "Execution", url: "/execution", icon: Play }, { title: "Paper Lab", url: "/paper-lab", icon: FlaskConical }] },
   { title: "System", items: [{ title: "Alerts", url: "/alerts", icon: Bell }, { title: "Exchanges", url: "/exchanges", icon: Link2 }, { title: "Logs & Audit", url: "/logs", icon: ScrollText }, { title: "Health", url: "/health", icon: HeartPulse }] },
 ];
-export const mobileLinks = [navigationGroups[0].items[0], navigationGroups[0].items[1], navigationGroups[1].items[1], navigationGroups[0].items[2]];
+export const mobileLinks = [navigationGroups[0].items[0], navigationGroups[0].items[1], navigationGroups[1].items.find(item => item.url === "/opportunities/buys")!, navigationGroups[0].items[2]];
