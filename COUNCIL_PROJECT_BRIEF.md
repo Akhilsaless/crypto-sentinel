@@ -79,3 +79,17 @@ Run CI/test suite and inspect actual failure logs; fix any failures; validate li
 5. Live trading **hard disabled**. User's intent to eventually trade real money does not supply valid per-order limits, keys, credentials, production approval or permission to spend infrastructure funds.
 
 **Decision:** read-only public market integration and deployment scaffolding proceed at zero known direct spend; user money remains untouched. No production completion claim until test, host and account gates clear.
+
+## 2026-11-03 — Direct Lovable hosting audit
+
+Verified using the connected Lovable account:
+- Existing project **Crypto Sentinel**, ID `aef19328-2ae9-44b5-9500-42693381dfec`, workspace `6oarWfFYQeKNfXo6XRp9`, editor `https://lovable.dev/projects/aef19328-2ae9-44b5-9500-42693381dfec`.
+- Project scaffold ready and latest Lovable agent finished; **is_published=false** and no published URL. Preview URL exists but is not a production publication.
+- Lovable cloud database status: **enabled=false**. No Lovable scheduler, database, or Edge Functions observed/verified.
+- The Lovable project file listing contains Phase 1 frontend pages; it does not contain `src/pages/MarketScanner.tsx` or the Python backend or deployment worker as of the audit.
+- GitHub `Akhilsaless/crypto-sentinel` contains the more recent scanner and exchange adapters; **not verified as synced to Lovable**. The Lovable connector does not expose the project Git connection metadata. The project's settings -> Git -> GitHub must be inspected to check *exact* linked repository and active branch before any synchronization attempt.
+- Lovable's official docs describe two-way sync for a *linked repository*, but connecting an unlinked project creates a new repo; do not assume an existing arbitrary GitHub repo can be imported.
+- Replit: no Crypto Sentinel deployment. Vercel: connected project list search returned no Crypto Sentinel project. Render: proposed configuration only, not deployed.
+
+### Corrected hosting decision
+Preserve both original Lovable project and GitHub code. Do **not** publish the older frontend and call it the newer scanner. No credit-consuming Lovable AI message, database provisioning, or publishing is authorized on this audit. Investigate linked GitHub repo in Lovable settings and whether the user has suitable Lovable Cloud scheduling entitlements/budget. A React site on Lovable alone does not run the current Python scanner process; it needs a separately hosted Python worker or a verified port to scheduled Edge Functions with durable database state.
