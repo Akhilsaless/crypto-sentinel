@@ -47,6 +47,7 @@ def evaluate(bars: list[Bar], frame: str, fee_bps: int = 15,
                            now=completed[-1].timestamp + interval_seconds)
         signal = research["signal"]
         open_price = float(current.open)
+        exited_this_bar = False
         if held is not None:
             trigger = None
             raw_exit = open_price
@@ -70,7 +71,8 @@ def evaluate(bars: list[Bar], frame: str, fee_bps: int = 15,
                 trades.append({"side":"sell","timestamp":current.timestamp,
                                "reason":trigger,"pnl_usd":round(pnl,2)})
                 held = None
-        if held is None and signal == "entry_watch":
+                exited_this_bar = True
+        if held is None and not exited_this_bar and signal == "entry_watch":
             entry_price = open_price * (1 + slip)
             stop = research["hypothetical_long_stop_usd"]
             target = research["hypothetical_long_target_usd"]
@@ -86,6 +88,20 @@ def evaluate(bars: list[Bar], frame: str, fee_bps: int = 15,
                     trades.append({"side":"buy","timestamp":current.timestamp,
                                    "reason":"completed_bar_entry_watch",
                                    "quantity":round(qty,8)})
+                    # The intrabar event order is unknown. Treat stop as first.
+                    immediate_exit = (stop if current.low <= stop else
+                                      target if current.high >= target else None)
+                    if immediate_exit is not None:
+                        exit_price = immediate_exit * (1 - slip)
+                        gross = qty * exit_price
+                        charge = gross * rate
+                        cash += gross - charge
+                        fees_paid += charge
+                        pnl = gross - charge - cost
+                        trades.append({"side":"sell","timestamp":current.timestamp,
+                                       "reason":"entry_bar_stop" if current.low <= stop else "entry_bar_target",
+                                       "pnl_usd":round(pnl,2)})
+                        held = None
         equity = cash + (held.qty * current.close if held else 0)
         peak = max(peak,equity)
         maximum_drawdown = max(maximum_drawdown,(peak-equity)/peak)
