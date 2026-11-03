@@ -76,3 +76,29 @@ def test_incomplete_four_hour_buckets_not_aggregated():
     base=2000000*14400
     candles=[Bar(base+i*HOUR,102,98,100,100) for i in range(3)]
     assert _aggregate_utc_4h(candles,now=base+4*HOUR)==[]
+
+
+def test_exchange_scanner_requires_authentication_and_remains_read_only(tmp_path,monkeypatch):
+    from fastapi.testclient import TestClient
+    from sentinel.main import build_app
+    import sentinel.main as module
+    now=2_000_000_000
+    def fake_candles(exchange,asset,frame):
+        interval=(60 if frame=="intraday" else 240)*60
+        current=__import__("time").time()
+        return [Bar(int(current-(90-i)*interval),120+i,100+i,110+i,110+i)
+                for i in range(90)]
+    monkeypatch.setattr(module,"exchange_candles",fake_candles)
+    with TestClient(build_app(str(tmp_path/"integrations.test.sqlite3"))) as client:
+        assert client.get("/research/exchanges/binance/scan/BTC/intraday").status_code==401
+        client.post("/auth/register",json={"username":"trial","password":"strong-test-password"})
+        login=client.post("/auth/login",json={"username":"trial","password":"strong-test-password"})
+        assert login.status_code==200
+        token={"Authorization":"Bearer "+login.json()["access_token"]}
+        got=client.get("/research/exchanges/binance/scan/BTC/intraday",headers=token)
+        assert got.status_code==200
+        assert got.json()["exchange"]=="binance"
+        assert got.json()["quote_currency"]=="USDT"
+        assert got.json()["mode"]=="read_only_research"
+        assert client.post("/live/orders",headers=token).status_code==404
+        assert client.get("/research/exchanges/unknown/scan/BTC/intraday",headers=token).status_code==422
