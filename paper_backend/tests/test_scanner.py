@@ -40,3 +40,27 @@ def test_rejects_unsupported_symbols_before_network():
 def test_flat_market_rsi_is_neutral():
     from sentinel.scanner import rsi
     assert rsi([100.0]*70)==50.0
+
+def test_kraken_ohlc_excludes_unfinished_final_bar():
+    import httpx
+    rows=[]
+    for i in range(90):
+        ts=int(NOW-(90-i)*STEP)
+        p=100+i*0.2
+        rows.append([ts,str(p),"0",str(p+0.6),str(p-0.6),str(p),"0","1"])
+    rows.append([int(NOW), "100", "0", "999999", "1", "999999", "0", "1"])
+    def handler(request):
+        assert request.url.params["pair"]=="XBTUSD"
+        return httpx.Response(200,json={"error":[],"result":{"XXBTZUSD":rows,"last":NOW}})
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        observed=kraken_candles("BTC","intraday",client=client,now=NOW)
+    assert len(observed)==90
+    assert observed[-1].close < 999999
+
+def test_provider_errors_fail_closed():
+    import httpx
+    def handler(request):
+        return httpx.Response(200,json={"error":["EQuery:Rate limit exceeded"],"result":{}})
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(MarketDataError):
+            kraken_candles("BTC","intraday",client=client,now=NOW)
