@@ -1,0 +1,24 @@
+# PROPOSED Render Blueprint — NOT ACTIVE.
+# Do not move to repository root or deploy until the user approves
+# the paid background worker and persistent storage charges.
+# Official reference: https://render.com/docs/blueprint-spec
+services:
+  - type: worker
+    name: crypto-sentinel-public-data-worker
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb
+    branch: main
+    dockerfilePath: deploy/Dockerfile.scanner
+    dockerContext: .
+    # The Dockerfile CMD runs the continuous read-only scanner.
+    # CoinDCX/Binance trading account credentials are never configured.
+    envVars:
+      - key: SENTINEL_STATE_DIR
+        value: /app/state
+      - key: LIVE_TRADING_ENABLED
+        value: "false"
+    disk:
+      name: research-alert-dedup
+      mountPath: /app/state
+      sizeGB: 1
