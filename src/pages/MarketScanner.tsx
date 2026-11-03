@@ -13,6 +13,7 @@ type Scan = {
 };
 const symbols = ["BTC","ETH","SOL"] as const;
 const frames = ["intraday","swing"] as const;
+type Evaluation = { symbol:string;timeframe:string;mode:"historical_research_only";holdout_bars:number;return_pct:number;max_drawdown_pct:number;round_trips_closed:number;win_rate_pct:number|null;warning:string; };
 
 export default function MarketScanner() {
   const [username, setUsername] = useState("");
@@ -21,6 +22,7 @@ export default function MarketScanner() {
   const [rows, setRows] = useState<Scan[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [evaluations,setEvaluations] = useState<Record<string,Evaluation>>({});
   const [issue, setIssue] = useState("");
   const login=async()=>{
     setBusy(true);setIssue("");
@@ -43,6 +45,15 @@ export default function MarketScanner() {
       });
       setRows(valid);setErrors(failed);
     } catch(e) {setIssue(e instanceof Error?e.message:"Scanner unavailable");}
+    finally {setBusy(false);}
+  };
+  const evaluateOne=async(symbol:string,timeframe:string)=>{
+    setBusy(true);setIssue("");
+    try {
+      const data=await paperRequest<Evaluation>(`/research/evaluate/${symbol}/${timeframe}`,token);
+      if(data.mode!=="historical_research_only")throw new Error("Unexpected evaluation response");
+      setEvaluations(previous=>({...previous,[symbol+timeframe]:data}));
+    } catch(e) {setIssue(e instanceof Error?e.message:"Evaluation unavailable");}
     finally {setBusy(false);}
   };
   const logout=async()=>{
@@ -72,7 +83,10 @@ export default function MarketScanner() {
         <p className="text-sm">Reference close: ${r.price_usd.toLocaleString()} · RSI14: {r.rsi14} · ATR14: {r.atr14}</p>
         <p className="text-sm">Illustrative long stop: ${r.hypothetical_long_stop_usd} · target: ${r.hypothetical_long_target_usd}</p>
         <ul className="list-disc pl-5 text-sm text-muted-foreground">{r.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>
-        <p className="text-xs text-amber-500">{r.warning}</p></article>)}</div>
+        <p className="text-xs text-amber-500">{r.warning}</p>
+        <Button variant="outline" size="sm" disabled={busy} onClick={()=>evaluateOne(r.symbol,r.timeframe)}>Evaluate historical holdout</Button>
+        {evaluations[r.symbol+r.timeframe]&&<div className="rounded border p-3 text-sm space-y-1"><p>Historical holdout ({evaluations[r.symbol+r.timeframe].holdout_bars} bars): {evaluations[r.symbol+r.timeframe].return_pct}% return; {evaluations[r.symbol+r.timeframe].max_drawdown_pct}% max drawdown</p><p>Closed simulated trades: {evaluations[r.symbol+r.timeframe].round_trips_closed}; win rate: {evaluations[r.symbol+r.timeframe].win_rate_pct ?? "N/A"}%</p><p className="text-xs text-amber-500">{evaluations[r.symbol+r.timeframe].warning}</p></div>}
+        </article>)}</div>
       {rows.length===0&&errors.length===0&&<p className="text-sm text-muted-foreground">Run a scan to request completed-market-candle analysis.</p>}
     </section>}
   </div>;
