@@ -51,3 +51,31 @@ Run CI/test suite and inspect actual failure logs; fix any failures; validate li
 - GitHub Actions run 41591733138: backend green; frontend had one outdated expected route count. Both navigation defects were corrected.
 - GitHub Actions run 41591868738: frontend green; backend failed one malformed synthetic Kraken OHLC fixture. Fixture was corrected at commit 7ad6849.
 - Latest additions to the evaluation engine and tests require fresh independent CI verification. **Do not infer green status from the absence of a failure email.**
+
+## 2026-11-03 — CoinDCX + Binance integration/deployment milestone
+
+**New explicit requirement:** both CoinDCX and Binance, live public market feeds, both intraday and swing research, and eventual continuously hosted 24/7 automation with separate verified and permissioned real-money trading.
+
+### Code delivered to GitHub (not yet production verified)
+- `sentinel/exchange_public.py`: no-credential, read-only BTC/ETH/SOL **spot USDT** candle adapters. Binance public `/api/v3/klines` 1h/4h; CoinDCX actual active pair from `/exchange/v1/markets_details` and spot `/market_data/candles` 1h, with UTC-complete 4h aggregation. Reject malformed/missing/stale candles. No fallback or manufactured prices.
+- Backend authenticated routes `/research/exchanges/{exchange}/scan/{symbol}/{frame}` and `/research/exchanges/{exchange}/evaluate/{symbol}/{frame}`. No exchange account data or authenticated orders.
+- React market scanner exchange selector; Exchanges page explicitly states adapter versus verified connectivity and USDT vs USD distinction.
+- `sentinel/exchange_worker.py`: read-only multi-exchange one-shot and 15-minute looping worker, heartbeat, degraded mode, durable per-exchange local dedup state and opt-in Telegram research alerts.
+- `deploy/Dockerfile.scanner`, `deploy/docker-compose.yml`: single replica, non-root, read-only container filesystem, no inbound ports, persistent scanner volume. The container was **not built or run on a host** in this session.
+- `.github/workflows/read-only-exchange-scan.yml`: scheduled hourly, manual and code-change-triggered **best-effort** cloud public-market check. GitHub Actions schedule does **not** guarantee 24/7 continuous uptime, and runtime success has not yet been confirmed.
+- `tests/test_exchange_public.py` and `tests/test_exchange_worker.py`: offline endpoint/provider/worker tests committed; latest-run CI outcome still requires verification.
+
+### Relevant official API facts and safeguards
+- Binance spot public market-data endpoint `https://data-api.binance.vision/api/v3/klines` requires no credentials; official Binance docs.
+- CoinDCX public candles and markets details are unauthenticated. Official CoinDCX API FAQ explicitly states that it currently does **not** provide read-only authenticated API keys. **Do not gather CoinDCX private API keys for monitoring or assume granular key permissions.**
+- Binance and CoinDCX spot quotes in USDT are not identical to cash USD. Do not label them guaranteed USD.
+- No account balances, authenticated exchange connections, exchange withdrawals, real order placement, or 24/7 hosted scanner verified.
+
+### Current blockers and next actions
+1. Latest GitHub CI validation and cloud provider smoke job need a confirmed green result. Tests/builds cannot be marked passing from commits alone.
+2. A user-authorized persistent Docker host or equivalent always-on service plus acceptable ongoing cost and access must be selected before true 24/7 deployment. No Crypto Sentinel Vercel project was found in the connected project search; Vercel static frontend alone is not a durable worker.
+3. Host-side checks required: public market availability from server region, outbound networking, secrets, monitoring, alert delivery, backup/restore, restart recovery, network outage and durability.
+4. Explicit separately approved exchange account, jurisdiction, risk budget and spending limits; verified supported API scopes; and independent security/order lifecycle tests are mandatory prior to any real-money trade. CoinDCX keys require enhanced caution due to lack of read-only permissions.
+5. Live trading **hard disabled**. User's intent to eventually trade real money does not supply valid per-order limits, keys, credentials, production approval or permission to spend infrastructure funds.
+
+**Decision:** read-only public market integration and deployment scaffolding proceed at zero known direct spend; user money remains untouched. No production completion claim until test, host and account gates clear.
