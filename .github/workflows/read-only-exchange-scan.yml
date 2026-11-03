@@ -1,0 +1,26 @@
+name: CoinDCX Binance Read-Only Market Check
+on:
+  workflow_dispatch:
+  schedule:
+    # Best-effort hourly cloud scan, not a continuously running 24/7 service.
+    - cron: "17 * * * *"
+permissions:
+  contents: read
+concurrency:
+  group: market-data-research-scan
+  cancel-in-progress: false
+jobs:
+  read-only-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install research dependencies
+        run: python -m pip install -r paper_backend/requirements.txt
+      - name: Scan public CoinDCX and Binance candles (NO TRADING)
+        env:
+          PYTHONPATH: paper_backend
+        run: python -m sentinel.exchange_worker --once
