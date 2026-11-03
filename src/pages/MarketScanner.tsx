@@ -9,7 +9,7 @@ type Scan = {
   as_of_candle: number; price_usd: number; rsi14: number; atr14: number;
   ema9: number; ema21: number; hypothetical_long_stop_usd: number;
   hypothetical_long_target_usd: number; reasons: string[]; warning: string;
-  mode: "read_only_research";
+  mode: "read_only_research"; exchange?: string; quote_currency?: string;
 };
 const symbols = ["BTC","ETH","SOL"] as const;
 const frames = ["intraday","swing"] as const;
@@ -19,6 +19,7 @@ export default function MarketScanner() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
+  const [exchange,setExchange] = useState<"binance"|"coindcx"|"kraken">("binance");
   const [rows, setRows] = useState<Scan[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -37,7 +38,7 @@ export default function MarketScanner() {
     try {
       const requests=symbols.flatMap(symbol=>frames.map(timeframe=>({symbol,timeframe})));
       const outcomes=await Promise.allSettled(requests.map(({symbol,timeframe})=>
-        paperRequest<Scan>(`/research/scan/${symbol}/${timeframe}`,token)));
+        paperRequest<Scan>(exchange==="kraken" ? `/research/scan/${symbol}/${timeframe}` : `/research/exchanges/${exchange}/scan/${symbol}/${timeframe}`,token)));
       const valid:Scan[]=[];const failed:string[]=[];
       outcomes.forEach((result,i)=>{
         if(result.status==="fulfilled"&&result.value.mode==="read_only_research") valid.push(result.value);
@@ -50,9 +51,9 @@ export default function MarketScanner() {
   const evaluateOne=async(symbol:string,timeframe:string)=>{
     setBusy(true);setIssue("");
     try {
-      const data=await paperRequest<Evaluation>(`/research/evaluate/${symbol}/${timeframe}`,token);
+      const data=await paperRequest<Evaluation>(exchange==="kraken" ? `/research/evaluate/${symbol}/${timeframe}` : `/research/exchanges/${exchange}/evaluate/${symbol}/${timeframe}`,token);
       if(data.mode!=="historical_research_only")throw new Error("Unexpected evaluation response");
-      setEvaluations(previous=>({...previous,[symbol+timeframe]:data}));
+      setEvaluations(previous=>({...previous,[exchange+symbol+timeframe]:data}));
     } catch(e) {setIssue(e instanceof Error?e.message:"Evaluation unavailable");}
     finally {setBusy(false);}
   };
@@ -63,7 +64,7 @@ export default function MarketScanner() {
   };
   return <div className="max-w-6xl space-y-5">
     <header className="space-y-2"><h1 className="text-2xl font-bold">Market Research Scanner</h1>
-      <p className="text-sm text-muted-foreground">BTC, ETH and SOL · 1-hour intraday / 4-hour swing candles · Kraken read-only public feed. No automated trades.</p>
+      <p className="text-sm text-muted-foreground">BTC, ETH and SOL · 1-hour intraday / 4-hour swing candles · exchange-specific read-only public spot feeds. No automated trades.</p>
       <p className="text-xs text-amber-500">Experimental, unvalidated signals. Never use alone to place a real-money trade. Data outage means no signal.</p>
       <p className="text-sm"><Link className="underline" to="/paper-lab">Open virtual trading lab</Link></p></header>
     {issue&&<p role="alert" className="text-destructive text-sm">{issue}</p>}
@@ -74,18 +75,18 @@ export default function MarketScanner() {
       <label className="block text-sm">Password<Input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
       <Button disabled={busy||username.length<3||password.length<12} onClick={login}>Sign in</Button>
     </section>:<section className="space-y-4">
-      <div className="flex gap-3"><Button disabled={busy} onClick={scan}>{busy?"Scanning…":"Scan 6 markets"}</Button>
+      <div className="flex flex-wrap items-center gap-3"><label className="text-sm">Exchange <select aria-label="Research exchange" className="ml-2 rounded border bg-background p-2" value={exchange} onChange={e=>{setExchange(e.target.value as typeof exchange);setRows([]);setErrors([]);setEvaluations({});}}><option value="binance">Binance spot</option><option value="coindcx">CoinDCX spot</option><option value="kraken">Kraken spot (legacy)</option></select></label><Button disabled={busy} onClick={scan}>{busy?"Scanning…":"Scan 6 markets"}</Button>
         <Button variant="outline" disabled={busy} onClick={logout}>Sign out</Button></div>
       {errors.length>0&&<div role="alert" className="rounded border border-destructive p-3 text-sm"><strong>Data unavailable; signals suppressed:</strong>{errors.map(e=><p key={e}>{e}</p>)}</div>}
-      <div className="grid gap-3 md:grid-cols-2">{rows.map(r=><article className="rounded border p-4 space-y-2" key={r.symbol+r.timeframe}>
-        <div className="flex justify-between items-center"><h2 className="font-semibold">{r.symbol} / USD — {r.timeframe}</h2><span className="text-sm font-semibold">{r.signal.replaceAll("_"," ").toUpperCase()}</span></div>
+      <div className="grid gap-3 md:grid-cols-2">{rows.map(r=><article className="rounded border p-4 space-y-2" key={exchange+r.symbol+r.timeframe}>
+        <div className="flex justify-between items-center"><h2 className="font-semibold">{r.symbol} / {r.quote_currency ?? "USD"} — {r.timeframe}</h2><span className="text-sm font-semibold">{r.signal.replaceAll("_"," ").toUpperCase()}</span></div>
         <p className="text-xs text-muted-foreground">Last completed candle: {new Date(r.as_of_candle*1000).toLocaleString()}</p>
-        <p className="text-sm">Reference close: ${r.price_usd.toLocaleString()} · RSI14: {r.rsi14} · ATR14: {r.atr14}</p>
-        <p className="text-sm">Illustrative long stop: ${r.hypothetical_long_stop_usd} · target: ${r.hypothetical_long_target_usd}</p>
+        <p className="text-sm">Reference close: {r.price_usd.toLocaleString()} {r.quote_currency ?? "USD"} · RSI14: {r.rsi14} · ATR14: {r.atr14}</p>
+        <p className="text-sm">Illustrative long stop: {r.hypothetical_long_stop_usd} · target: {r.hypothetical_long_target_usd} {r.quote_currency ?? "USD"}</p>
         <ul className="list-disc pl-5 text-sm text-muted-foreground">{r.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>
         <p className="text-xs text-amber-500">{r.warning}</p>
         <Button variant="outline" size="sm" disabled={busy} onClick={()=>evaluateOne(r.symbol,r.timeframe)}>Evaluate historical holdout</Button>
-        {evaluations[r.symbol+r.timeframe]&&<div className="rounded border p-3 text-sm space-y-1"><p>Historical holdout ({evaluations[r.symbol+r.timeframe].holdout_bars} bars): {evaluations[r.symbol+r.timeframe].return_pct}% return; {evaluations[r.symbol+r.timeframe].max_drawdown_pct}% max drawdown</p><p>Closed simulated trades: {evaluations[r.symbol+r.timeframe].round_trips_closed}; win rate: {evaluations[r.symbol+r.timeframe].win_rate_pct ?? "N/A"}%</p><p className="text-xs text-amber-500">{evaluations[r.symbol+r.timeframe].warning}</p></div>}
+        {evaluations[exchange+r.symbol+r.timeframe]&&<div className="rounded border p-3 text-sm space-y-1"><p>Historical holdout ({evaluations[exchange+r.symbol+r.timeframe].holdout_bars} bars): {evaluations[exchange+r.symbol+r.timeframe].return_pct}% return; {evaluations[exchange+r.symbol+r.timeframe].max_drawdown_pct}% max drawdown</p><p>Closed simulated trades: {evaluations[exchange+r.symbol+r.timeframe].round_trips_closed}; win rate: {evaluations[exchange+r.symbol+r.timeframe].win_rate_pct ?? "N/A"}%</p><p className="text-xs text-amber-500">{evaluations[exchange+r.symbol+r.timeframe].warning}</p></div>}
         </article>)}</div>
       {rows.length===0&&errors.length===0&&<p className="text-sm text-muted-foreground">Run a scan to request completed-market-candle analysis.</p>}
     </section>}
