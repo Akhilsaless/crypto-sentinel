@@ -35,9 +35,8 @@ def scan_once(notify=None, state_path=None, fetch=kraken_candles, clock=time.tim
                 output.append(record)
                 marker=f"{record['as_of_candle']}:{record['signal']}"
                 if record["signal"] in ("entry_watch","exit_watch") and state.get(key)!=marker:
-                    if notify:
-                        notify(record)
-                    new_state[key]=marker
+                    if notify and notify(record) is True:
+                        new_state[key]=marker
             except MarketDataError as err:
                 output.append({"symbol":symbol,"timeframe":frame,"status":"unavailable","error":str(err)})
     if path:
@@ -51,13 +50,14 @@ def telegram_notify(record):
     token=os.environ.get("SENTINEL_TELEGRAM_BOT_TOKEN")
     chat=os.environ.get("SENTINEL_TELEGRAM_CHAT_ID")
     if not token or not chat:
-        return
+        return False
     message=(f"Crypto Sentinel RESEARCH ONLY: {record['symbol']} {record['timeframe']} "
              f"{record['signal']} at indicative ${record['price_usd']} USD. "
              f"Candle {record['as_of_candle']}. NOT a trade recommendation.")
     response=httpx.post(f"https://api.telegram.org/bot{token}/sendMessage",
                         json={"chat_id":chat,"text":message},timeout=10)
     response.raise_for_status()
+    return True
 
 def main():
     state=os.environ.get("SENTINEL_SCANNER_STATE","sentinel-scanner-state.json")
