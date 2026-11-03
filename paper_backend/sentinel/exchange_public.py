@@ -41,6 +41,17 @@ def _closed(bar: Bar, interval_seconds: int, now: float):
     return bar.timestamp >= 0 and bar.timestamp + interval_seconds <= now
 
 
+def _strict_exchange_bars(bars: list[Bar], minutes: int, now: float) -> list[Bar]:
+    """Never silently fill missing candles or accept a lagging market source."""
+    validate_bars(bars, minutes, now)
+    step=minutes*60
+    if any(b.timestamp-a.timestamp != step for a,b in zip(bars,bars[1:])):
+        raise MarketDataError("Missing or uneven exchange candles")
+    if now-bars[-1].timestamp >= 2*step:
+        raise MarketDataError("Latest exchange candle has not refreshed")
+    return bars
+
+
 def _aggregate_utc_4h(hourly: list[Bar], now: float) -> list[Bar]:
     """Build a 4h candle only from four contiguous complete UTC-aligned 1h bars."""
     groups: dict[int, list[Bar]] = {}
@@ -74,14 +85,15 @@ def _binance(asset: str, frame: str, client: httpx.Client, now: float):
     if not isinstance(payload, list):
         raise MarketDataError("Invalid Binance candle response")
     interval_seconds = FRAMES[frame] * 60
-    bars = [
-        Bar(int(row[0]) // 1000, _number(row[2]), _number(row[3]),
-            _number(row[4]), _number(row[1]))
-        for row in payload
-        if isinstance(row, list) and len(row) >= 7
-        and int(row[6]) < now * 1000
-    ]
-    return validate_bars(bars, FRAMES[frame], now)
+    bars = []
+    for row in payload:
+        if not isinstance(row, list) or len(row) < 7:
+            raise MarketDataError("Malformed Binance kline")
+        bar = Bar(int(row[0]) // 1000, _number(row[2]), _number(row[3]),
+                  _number(row[4]), _number(row[1]))
+        if int(row[6]) < now * 1000:
+            bars.append(bar)
+    return _strict_exchange_bars(bars, FRAMES[frame], now)
 
 
 def _coindcx_pair(asset: str, client: httpx.Client) -> str:
@@ -130,7 +142,7 @@ def _coindcx(asset: str, frame: str, client: httpx.Client, now: float):
     bars.sort(key=lambda bar: bar.timestamp)
     if frame == "swing":
         bars = _aggregate_utc_4h(bars, now)
-    return validate_bars(bars, FRAMES[frame], now)
+    return _strict_exchange_bars(bars, FRAMES[frame], now)
 
 
 def exchange_candles(exchange: Literal["binance", "coindcx"], asset: str, frame: str,
