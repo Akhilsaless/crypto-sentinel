@@ -22,6 +22,7 @@ import Alerts from "./pages/Alerts";
 import Journal from "./pages/Journal";
 import ChartReview from "./pages/ChartReview";
 import Learn from "./pages/Learn";
+import PaperLab from "./pages/PaperLab";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/strategy" element={<StrategyRisk />} />
             <Route path="/exchanges" element={<Exchanges />} />
             <Route path="/execution" element={<Execution />} />
+            <Route path="/paper-lab" element={<PaperLab />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/health" element={<Health />} />
