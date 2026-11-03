@@ -88,7 +88,7 @@ export default function PaperLab() {
       <section className="glass rounded-xl p-5 space-y-4">
         <h3 className="font-semibold">Manual virtual order</h3>
         <div className="grid sm:grid-cols-3 gap-3">
-          <label className="text-sm space-y-1">Symbol<select aria-label="Symbol" className="w-full rounded-md border bg-background p-2" value={symbol} onChange={e=>{setSymbol(e.target.value);setQuote("");}}><option>BTC</option><option>ETH</option><option>SOL</option></select></label>
+          <label className="text-sm space-y-1">Symbol<select aria-label="Symbol" className="w-full rounded-md border bg-background p-2" value={symbol} onChange={e=>{setSymbol(e.target.value);setQuote(null);}}><option>BTC</option><option>ETH</option><option>SOL</option></select></label>
           <label className="text-sm space-y-1">Side<select aria-label="Side" className="w-full rounded-md border bg-background p-2" value={side} onChange={e=>{setSide(e.target.value as "buy"|"sell");setQuote(null);}}><option value="buy">Buy</option><option value="sell">Sell</option></select></label>
           <label className="text-sm space-y-1">Quantity<Input aria-label="Quantity" inputMode="decimal" value={quantity} onChange={e=>{setQuantity(e.target.value);setQuote(null);}} /></label>
         </div>
