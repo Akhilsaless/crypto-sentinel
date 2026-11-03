@@ -14,7 +14,7 @@ export default function PaperLab() {
   const [symbol, setSymbol] = useState("BTC");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("0.001");
-  const [quote, setQuote] = useState("");
+  const [quote, setQuote] = useState<{price:string; timestamp:number; source:string} | null>(null);
   const [message, setMessage] = useState("Connect to the local Python API before using paper trading.");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,17 +38,20 @@ export default function PaperLab() {
   });
   const logout = () => task(async () => {
     try { await paperRequest("/auth/logout", token, "POST"); }
-    finally { setToken(""); setAccount(null); setOrders([]); setQuote(""); setMessage("Signed out of local paper session."); }
+    finally { setToken(""); setAccount(null); setOrders([]); setQuote(null); setMessage("Signed out of local paper session."); }
   });
   const lookUp = () => task(async () => {
-    const result = await paperRequest<{price_usd:string;source:string;timestamp:number}>("/market/" + symbol,token);
-    setQuote(result.price_usd); setMessage("Read-only quote from " + result.source + " at " + new Date(result.timestamp * 1000).toLocaleTimeString() + ". Not an execution guarantee.");
+    const result = await paperRequest<{price_usd:string;source:string;timestamp:number;is_sample:boolean}>("/market/" + symbol,token);
+    if (result.is_sample || !Number.isFinite(result.timestamp) || Math.abs(Date.now() / 1000 - result.timestamp) > 120) { setQuote(null); throw new Error("Market quote is sample or stale. No virtual order allowed."); }
+    setQuote({price:result.price_usd,timestamp:result.timestamp,source:result.source}); setMessage("Read-only quote from " + result.source + " at " + new Date(result.timestamp * 1000).toLocaleTimeString() + ". Not an execution guarantee.");
   });
   const sendOrder = () => task(async () => {
+    if (!quote || Math.abs(Date.now()/1000 - quote.timestamp) > 120) throw new Error("Fetch a fresh quote before confirming a virtual order.");
     if (!window.confirm("SIMULATED " + side.toUpperCase() + " " + quantity + " " + symbol + "? Virtual funds only. No real order will be sent.")) return;
     const id = "manual_" + crypto.randomUUID().replaceAll("-", "");
     await paperRequest("/paper/orders", token, "POST", { symbol, side, quantity, client_order_id: id });
     await refresh();
+    setQuote(null);
     setMessage("Virtual order recorded on your local paper account. No real exchange order.");
   });
   const kill = () => task(async () => {
@@ -86,13 +89,13 @@ export default function PaperLab() {
         <h3 className="font-semibold">Manual virtual order</h3>
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="text-sm space-y-1">Symbol<select aria-label="Symbol" className="w-full rounded-md border bg-background p-2" value={symbol} onChange={e=>{setSymbol(e.target.value);setQuote("");}}><option>BTC</option><option>ETH</option><option>SOL</option></select></label>
-          <label className="text-sm space-y-1">Side<select aria-label="Side" className="w-full rounded-md border bg-background p-2" value={side} onChange={e=>setSide(e.target.value as "buy"|"sell")}><option value="buy">Buy</option><option value="sell">Sell</option></select></label>
-          <label className="text-sm space-y-1">Quantity<Input aria-label="Quantity" inputMode="decimal" value={quantity} onChange={e=>setQuantity(e.target.value)} /></label>
+          <label className="text-sm space-y-1">Side<select aria-label="Side" className="w-full rounded-md border bg-background p-2" value={side} onChange={e=>{setSide(e.target.value as "buy"|"sell");setQuote(null);}}><option value="buy">Buy</option><option value="sell">Sell</option></select></label>
+          <label className="text-sm space-y-1">Quantity<Input aria-label="Quantity" inputMode="decimal" value={quantity} onChange={e=>{setQuantity(e.target.value);setQuote(null);}} /></label>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
           <Button variant="outline" disabled={busy} onClick={lookUp}>Fetch read-only quote</Button>
-          <span className="text-sm">Quote: {quote ? "$"+quote+" (indicative)" : "Not fetched"}</span>
-          <Button disabled={busy || Boolean(account?.killed) || !/^\d+(?:\.\d{1,6})?$/.test(quantity) || Number(quantity)<=0} onClick={sendOrder}>Place virtual order</Button>
+          <span className="text-sm">Quote: {quote ? "$"+quote.price+" (indicative · "+quote.source+")" : "Not fetched"}</span>
+          <Button disabled={busy || Boolean(account?.killed) || !quote || Math.abs(Date.now()/1000 - quote.timestamp)>120 || !/^\d+(?:\.\d{1,6})?$/.test(quantity) || Number(quantity)<=0} onClick={sendOrder}>Place virtual order</Button>
         </div>
       </section>
       <section className="glass rounded-xl p-5 space-y-3">
