@@ -20,6 +20,7 @@ from argon2 import PasswordHasher
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from sentinel.backtest import BacktestRequest, run_backtest
+from sentinel.scanner import kraken_candles, analyze, MarketDataError
 
 COINS = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}
 UNIT = 1_000_000
@@ -202,6 +203,18 @@ def build_app(db_path=None,quote_provider=None):
         q=app.state.provider.quote(symbol.upper())
         return {**q,"price_usd":fmt(q["price_cents"],100),
                 "note":"Read-only quote, not a guaranteed exchange execution price"}
+
+    @app.get("/research/scan/{symbol}/{frame}")
+    def scan(symbol:str,frame:str,user=Depends(auth)):
+        """Authenticated, read-only research; intentionally no execution capability."""
+        symbol=symbol.upper()
+        if symbol not in COINS or frame not in ("intraday","swing"):
+            raise HTTPException(422,"Supported assets: BTC ETH SOL; frames: intraday swing")
+        try:
+            bars=kraken_candles(symbol,frame)
+            return analyze(symbol,frame,bars)
+        except MarketDataError as e:
+            raise HTTPException(503,str(e)) from e
 
     @app.post("/research/backtest")
     def backtest(body:BacktestRequest,user=Depends(auth)):
