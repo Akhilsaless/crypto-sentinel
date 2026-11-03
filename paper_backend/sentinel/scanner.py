@@ -23,6 +23,7 @@ class Bar:
     high: float
     low: float
     close: float
+    open: float | None = None
 
 def validate_bars(raw: list[Bar], minutes: int, now: float | None = None) -> list[Bar]:
     now = time.time() if now is None else now
@@ -31,6 +32,8 @@ def validate_bars(raw: list[Bar], minutes: int, now: float | None = None) -> lis
     if any(not all(math.isfinite(p) and p > 0 for p in (b.high, b.low, b.close))
            or not b.low <= b.close <= b.high for b in raw):
         raise MarketDataError("Invalid candle prices")
+    if any(b.open is not None and (not math.isfinite(b.open) or not b.low <= b.open <= b.high) for b in raw):
+        raise MarketDataError("Invalid OHLC opening price")
     if any(b.timestamp <= a.timestamp for a, b in zip(raw, raw[1:])):
         raise MarketDataError("Missing ordering or duplicate timestamps")
     if raw[-1].timestamp > now or now - raw[-1].timestamp > minutes * 60 * 3:
@@ -59,7 +62,7 @@ def kraken_candles(symbol: str, frame: str, client: httpx.Client | None = None,
             raise MarketDataError("Missing candles")
         # Kraken documents the last OHLC row as the currently uncommitted candle.
         closed = result[key][:-1]
-        bars = [Bar(int(r[0]), float(r[2]), float(r[3]), float(r[4]))
+        bars = [Bar(int(r[0]), float(r[2]), float(r[3]), float(r[4]), float(r[1]))
                 for r in closed]
         return validate_bars(bars, minutes, now)
     except (httpx.HTTPError, KeyError, TypeError, ValueError, StopIteration) as e:
